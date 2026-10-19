@@ -1,4 +1,6 @@
+using SupportDesk.Domain.Aggregates.Customers;
 using SupportDesk.Domain.Aggregates.Tickets;
+using SupportDesk.Domain.Aggregates.Tickets.Triage;
 using SupportDesk.Domain.Exceptions;
 using SupportDesk.UnitTests.TestDoubles;
 
@@ -22,6 +24,22 @@ public class TicketTests
         Assert.Null(ticket.DueAtUtc);
         Assert.Equal(FixedClock.DefaultNow, ticket.CreatedAtUtc);
         Assert.Equal(FixedClock.DefaultNow, ticket.UpdatedAtUtc);
+    }
+
+    [Fact]
+    public void ApplyTriage_SetsPriorityDueDatesAndOwner()
+    {
+        var ticket = new TicketBuilder().WithPriority(TicketPriority.Low).Build();
+        var decision = new TicketTriage(TestSla.Policy()).ForNewTicket(
+            TicketPriority.Low, SeedDesk.Security, CustomerTier.Premium, SeedDesk.Agents, FixedClock.DefaultNow);
+
+        ticket.ApplyTriage(decision, Later);
+
+        Assert.Equal(TicketPriority.Critical, ticket.Priority);
+        Assert.Equal(decision.Sla.DueAtUtc, ticket.DueAtUtc);
+        Assert.Equal(decision.Sla.AtRiskFromUtc, ticket.AtRiskFromUtc);
+        Assert.Equal(SeedDesk.Priya.AgentId, ticket.AssignedAgentId);
+        Assert.Equal(Later, ticket.UpdatedAtUtc);
     }
 
     [Fact]

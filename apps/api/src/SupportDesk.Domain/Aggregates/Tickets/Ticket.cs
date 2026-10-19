@@ -1,3 +1,4 @@
+using SupportDesk.Domain.Aggregates.Tickets.Triage;
 using SupportDesk.Domain.Common;
 using SupportDesk.Domain.Exceptions;
 
@@ -83,6 +84,18 @@ public sealed class Ticket : AggregateRoot
             CreatedAtUtc = nowUtc,
             UpdatedAtUtc = nowUtc
         };
+    }
+
+    /// <summary>
+    /// Takes on what triage decided: the priority, the SLA dates and the owner (or none).
+    /// </summary>
+    public void ApplyTriage(TriageDecision decision, DateTime nowUtc)
+    {
+        Priority = decision.Priority;
+        DueAtUtc = decision.Sla.DueAtUtc;
+        AtRiskFromUtc = decision.Sla.AtRiskFromUtc;
+        AssignedAgentId = decision.Assignment.AgentId;
+        UpdatedAtUtc = nowUtc;
     }
 
     /// <summary>

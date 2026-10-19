@@ -43,8 +43,17 @@ internal sealed class SqliteSupportDatabase : IDisposable
     public Category AddCategory(string name, bool requiresSpecialist = false, bool forcesCriticalPriority = false) =>
         Save(new Category(name, requiresSpecialist, forcesCriticalPriority));
 
-    public Agent AddAgent(string fullName, int maxOpenTickets = 10) =>
-        Save(new Agent(fullName, $"{Guid.NewGuid():N}@example.com", maxOpenTickets, FixedClock.DefaultNow));
+    public Agent AddAgent(string fullName, int maxOpenTickets = 10, params Category[] specializations)
+    {
+        var agent = new Agent(fullName, $"{Guid.NewGuid():N}@example.com", maxOpenTickets, FixedClock.DefaultNow);
+
+        foreach (var category in specializations)
+        {
+            agent.AddSpecialization(category.Id);
+        }
+
+        return Save(agent);
+    }
 
     public Ticket AddTicket(
         string reference,

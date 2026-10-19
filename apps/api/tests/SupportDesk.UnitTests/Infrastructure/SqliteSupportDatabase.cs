@@ -4,6 +4,7 @@ using SupportDesk.Domain.Aggregates.Agents;
 using SupportDesk.Domain.Aggregates.Categories;
 using SupportDesk.Domain.Aggregates.Customers;
 using SupportDesk.Domain.Aggregates.Tickets;
+using SupportDesk.Domain.Aggregates.Tickets.Triage;
 using SupportDesk.Infrastructure.Data;
 using SupportDesk.UnitTests.TestDoubles;
 
@@ -76,6 +77,35 @@ internal sealed class SqliteSupportDatabase : IDisposable
         if (status != TicketStatus.New)
         {
             ticket.ChangeStatus(status, FixedClock.DefaultNow);
+        }
+
+        return Save(ticket);
+    }
+
+    /// <summary>A ticket with an SLA, optionally resolved, for tests about SLA status.</summary>
+    public Ticket AddTicketWithSla(
+        string reference,
+        Customer customer,
+        Category category,
+        DateTime dueAtUtc,
+        DateTime atRiskFromUtc,
+        DateTime? resolvedAtUtc = null,
+        TicketPriority priority = TicketPriority.Medium)
+    {
+        var ticket = Ticket.Raise(
+            reference, "Something is not working", "A description long enough to be realistic.",
+            customer.Id, category.Id, priority, FixedClock.DefaultNow);
+
+        ticket.ApplyTriage(
+            new TriageDecision(
+                priority, "Test",
+                new SlaTerms(dueAtUtc - atRiskFromUtc, dueAtUtc, atRiskFromUtc, "Test"),
+                new AssignmentDecision(null, "Test")),
+            FixedClock.DefaultNow);
+
+        if (resolvedAtUtc is { } resolved)
+        {
+            ticket.ChangeStatus(TicketStatus.Resolved, resolved);
         }
 
         return Save(ticket);

@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using SupportDesk.Application.Abstractions;
 using SupportDesk.Application.Contracts.Common;
@@ -22,11 +23,12 @@ public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQu
     /// </remarks>
     public async Task<PagedResult<TicketListItemDto>> GetPagedAsync(TicketQuery query, CancellationToken ct)
     {
-        var tickets = ApplyFilters(TicketsWithLabels(), query);
+        // One "now" for the whole request, so the filter and the status shown agree.
+        var now = clock.UtcNow;
+
+        var tickets = ApplyFilters(TicketsWithLabels(), query, now);
 
         var totalCount = await tickets.CountAsync(ct);
-
-        var now = clock.UtcNow;
 
         var items = await ApplySort(tickets, query)
             .Skip((query.Page - 1) * query.PageSize)
@@ -151,7 +153,10 @@ public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQu
     /// Narrows the list to the filters that were supplied, combined with AND. Each filter is one
     /// condition here, translated to SQL; a new filter is one more <c>if</c>.
     /// </summary>
-    private static IQueryable<TicketWithLabels> ApplyFilters(IQueryable<TicketWithLabels> source, TicketQuery query)
+    private static IQueryable<TicketWithLabels> ApplyFilters(
+        IQueryable<TicketWithLabels> source,
+        TicketQuery query,
+        DateTime nowUtc)
     {
         if (query.Status is { } status)
         {
@@ -193,7 +198,38 @@ public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQu
                 x.Customer.Name.Contains(search));
         }
 
+        if (query.SlaStatus is { } slaStatus)
+        {
+            source = source.Where(HasSlaStatus(slaStatus, nowUtc));
+        }
+
         return source;
+    }
+
+    /// <summary>
+    /// <see cref="SlaEvaluator.Rule"/> applied to the ticket's own columns and compared with
+    /// <paramref name="status"/>: the same rule that decides the status shown, so the filter and
+    /// the list cannot disagree. EF Core translates it to a CASE expression in the WHERE clause.
+    /// </summary>
+    private static Expression<Func<TicketWithLabels, bool>> HasSlaStatus(SlaStatus status, DateTime nowUtc)
+    {
+        var rule = SlaEvaluator.Rule;
+        var row = Expression.Parameter(typeof(TicketWithLabels), "x");
+        var ticket = Expression.Property(row, nameof(TicketWithLabels.Ticket));
+
+        // Captured values rather than constants, so they reach SQL as parameters.
+        Expression<Func<DateTime>> now = () => nowUtc;
+        Expression<Func<SlaStatus>> wanted = () => status;
+
+        var statusOfTicket = new ParameterReplacer(new Dictionary<ParameterExpression, Expression>
+        {
+            [rule.Parameters[0]] = Expression.Property(ticket, nameof(Ticket.DueAtUtc)),
+            [rule.Parameters[1]] = Expression.Property(ticket, nameof(Ticket.AtRiskFromUtc)),
+            [rule.Parameters[2]] = Expression.Property(ticket, nameof(Ticket.ResolvedAtUtc)),
+            [rule.Parameters[3]] = now.Body
+        }).Visit(rule.Body);
+
+        return Expression.Lambda<Func<TicketWithLabels, bool>>(Expression.Equal(statusOfTicket, wanted.Body), row);
     }
 
     private static IQueryable<TicketWithLabels> ApplySort(IQueryable<TicketWithLabels> source, TicketQuery query)

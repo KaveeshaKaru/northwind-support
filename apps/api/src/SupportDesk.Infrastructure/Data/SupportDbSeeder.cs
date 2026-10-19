@@ -5,6 +5,7 @@ using SupportDesk.Domain.Aggregates.Agents;
 using SupportDesk.Domain.Aggregates.Categories;
 using SupportDesk.Domain.Aggregates.Customers;
 using SupportDesk.Domain.Aggregates.Tickets;
+using SupportDesk.Domain.Aggregates.Tickets.Triage;
 
 namespace SupportDesk.Infrastructure.Data;
 
@@ -14,10 +15,15 @@ namespace SupportDesk.Infrastructure.Data;
 /// produce the same database.
 /// </summary>
 /// <remarks>
-/// Every aggregate is built through its own behaviour. The two historical values no behaviour
-/// produces - a ticket's last update and its due date - are set through EF Core directly.
+/// Every aggregate is built through its own behaviour. The historical values no behaviour
+/// produces - a ticket's last update, its due date and when it became at risk - are set through
+/// EF Core directly.
 /// </remarks>
-public sealed class SupportDbSeeder(SupportDbContext db, IClock clock, ILogger<SupportDbSeeder> logger)
+public sealed class SupportDbSeeder(
+    SupportDbContext db,
+    IClock clock,
+    SlaSettings sla,
+    ILogger<SupportDbSeeder> logger)
 {
     /// <summary>Seeds the database, unless it already has tickets in it.</summary>
     public async Task SeedAsync(CancellationToken ct = default)
@@ -194,7 +200,11 @@ public sealed class SupportDbSeeder(SupportDbContext db, IClock clock, ILogger<S
             var entry = db.Add(ticket);
             entry.Property(t => t.UpdatedAtUtc).CurrentValue =
                 createdAtUtc.AddMinutes(row.ResolvedAfterMinutes ?? row.CreatedMinutesAgo / 2);
-            entry.Property(t => t.DueAtUtc).CurrentValue = createdAtUtc.AddMinutes(row.SlaWindowMinutes);
+            var window = TimeSpan.FromMinutes(row.SlaWindowMinutes);
+            var dueAtUtc = createdAtUtc + window;
+            entry.Property(t => t.DueAtUtc).CurrentValue = dueAtUtc;
+            entry.Property(t => t.AtRiskFromUtc).CurrentValue =
+                dueAtUtc - window * (sla.AtRiskThresholdPercent / 100);
         }
     }
 

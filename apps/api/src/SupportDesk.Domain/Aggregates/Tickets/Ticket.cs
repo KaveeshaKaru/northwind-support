@@ -43,6 +43,12 @@ public sealed class Ticket : AggregateRoot
     /// <summary>When the team has committed to responding by. Null when no SLA applies.</summary>
     public DateTime? DueAtUtc { get; private set; }
 
+    /// <summary>
+    /// From when the ticket counts as at risk of missing <see cref="DueAtUtc"/>: the start of the
+    /// last part of its SLA window. Set together with the due date; null when no SLA applies.
+    /// </summary>
+    public DateTime? AtRiskFromUtc { get; private set; }
+
     public DateTime? ResolvedAtUtc { get; private set; }
 
     /// <summary>True while the ticket still needs work from an agent.</summary>

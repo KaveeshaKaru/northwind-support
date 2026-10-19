@@ -24,6 +24,27 @@ public sealed class TicketTriage(SlaPolicy sla)
             sla.For(priority.Priority, tier, nowUtc),
             AgentSelector.Choose(category, agents));
     }
+
+    /// <summary>
+    /// What escalating <paramref name="ticket"/> now would mean: one priority level up, a fresh
+    /// SLA from this moment, and the current owner kept while still eligible.
+    /// </summary>
+    /// <exception cref="Exceptions.BusinessRuleViolationException">The ticket cannot be escalated.</exception>
+    public TriageDecision ForEscalation(
+        Ticket ticket,
+        Category category,
+        CustomerTier tier,
+        IReadOnlyCollection<AgentWorkload> agents,
+        DateTime nowUtc)
+    {
+        var priority = ticket.EscalatedPriority();
+
+        return new TriageDecision(
+            priority,
+            $"Escalated from {ticket.Priority} to {priority}",
+            sla.For(priority, tier, nowUtc),
+            AgentSelector.Choose(category, agents, ticket.AssignedAgentId));
+    }
 }
 
 /// <summary>Everything triage decided about a ticket, with a reason for each part.</summary>

@@ -43,4 +43,8 @@ public sealed class TicketDetailDto
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public TriageDto? Triage { get; set; }
+
+    /// <summary>The escalation just recorded. Only in the response to an escalation.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public EscalationDto? Escalation { get; set; }
 }

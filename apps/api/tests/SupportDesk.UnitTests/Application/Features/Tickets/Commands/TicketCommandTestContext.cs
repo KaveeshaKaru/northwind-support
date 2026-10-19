@@ -3,6 +3,7 @@ using SupportDesk.Application.Abstractions;
 using SupportDesk.Application.Contracts.Tickets;
 using SupportDesk.Application.Features.Tickets.Commands.AssignTicket;
 using SupportDesk.Application.Features.Tickets.Commands.ChangeTicketStatus;
+using SupportDesk.Application.Features.Tickets.Commands.EscalateTicket;
 using SupportDesk.Application.Features.Tickets.Commands.RaiseTicket;
 using SupportDesk.Application.Features.Tickets.Queries.GetTicket;
 using SupportDesk.Domain.Aggregates.Agents;
@@ -49,6 +50,13 @@ internal sealed class TicketCommandTestContext
                 Category = new CategoryDto(1, "General", false)
             });
 
+        // The history the escalate command reads back: one row standing for the escalation it just made.
+        TicketQueries.Setup(q => q.GetEscalationsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new EscalationDto(0, TicketPriority.High, TicketPriority.Critical, null, null, null, null,
+                    "Customer's site is down.", "alex.lead", FixedClock.DefaultNow)
+            ]);
+
         var getTicket = new GetTicketQueryHandler(TicketQueries.Object);
 
         RaiseTicket = new RaiseTicketCommandHandler(
@@ -57,6 +65,11 @@ internal sealed class TicketCommandTestContext
             NullLogger<RaiseTicketCommandHandler>.Instance);
 
         ChangeTicketStatus = new ChangeTicketStatusCommandHandler(Tickets.Object, UnitOfWork.Object, Clock, getTicket);
+
+        EscalateTicket = new EscalateTicketCommandHandler(
+            Tickets.Object, Customers.Object, Categories.Object, AgentWorkloads.Object,
+            new TicketTriage(TestSla.Policy()), UnitOfWork.Object, Clock, getTicket, TicketQueries.Object,
+            NullLogger<EscalateTicketCommandHandler>.Instance);
 
         AssignTicket = new AssignTicketCommandHandler(
             Tickets.Object, Agents.Object, UnitOfWork.Object, Clock, getTicket,
@@ -94,6 +107,8 @@ internal sealed class TicketCommandTestContext
     public ChangeTicketStatusCommandHandler ChangeTicketStatus { get; }
 
     public AssignTicketCommandHandler AssignTicket { get; }
+
+    public EscalateTicketCommandHandler EscalateTicket { get; }
 
     /// <summary>The ticket handed to the repository by the last create call.</summary>
     public Ticket? AddedTicket { get; private set; }

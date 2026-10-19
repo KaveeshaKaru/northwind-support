@@ -3,7 +3,9 @@ using SupportDesk.Application.Contracts.Common;
 using SupportDesk.Application.Contracts.Tickets;
 using SupportDesk.Application.Features.Tickets.Commands.AssignTicket;
 using SupportDesk.Application.Features.Tickets.Commands.ChangeTicketStatus;
+using SupportDesk.Application.Features.Tickets.Commands.EscalateTicket;
 using SupportDesk.Application.Features.Tickets.Commands.RaiseTicket;
+using SupportDesk.Application.Features.Tickets.Queries.GetEscalations;
 using SupportDesk.Application.Features.Tickets.Queries.GetTicket;
 using SupportDesk.Application.Features.Tickets.Queries.SearchTickets;
 
@@ -56,4 +58,24 @@ public sealed class TicketsController : ControllerBase
         [FromServices] AssignTicketCommandHandler handler,
         CancellationToken ct) =>
         handler.HandleAsync(id, request, ct);
+
+    /// <summary>
+    /// Raises the ticket's priority one level, restarts its SLA from now and re-evaluates its
+    /// owner. 409 when it is already Critical, or Resolved or Closed.
+    /// </summary>
+    [HttpPost("{id:int}/escalate")]
+    public Task<TicketDetailDto> Escalate(
+        int id,
+        EscalateTicketRequest request,
+        [FromServices] EscalateTicketCommandHandler handler,
+        CancellationToken ct) =>
+        handler.HandleAsync(id, request, ct);
+
+    /// <summary>The ticket's escalation history, newest first.</summary>
+    [HttpGet("{id:int}/escalations")]
+    public Task<IReadOnlyList<EscalationDto>> GetEscalations(
+        int id,
+        [FromServices] GetEscalationsQueryHandler handler,
+        CancellationToken ct) =>
+        handler.HandleAsync(id, ct);
 }

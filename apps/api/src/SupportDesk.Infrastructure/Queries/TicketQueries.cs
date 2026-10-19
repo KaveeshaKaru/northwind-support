@@ -79,6 +79,37 @@ public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQu
             .FirstOrDefaultAsync(ct);
     }
 
+    /// <remarks>
+    /// Reads through IX_TicketEscalations_TicketId_EscalatedAtUtc, which already holds a
+    /// ticket's rows newest first. Agent names are joined in, both sides optional.
+    /// </remarks>
+    public async Task<IReadOnlyList<EscalationDto>?> GetEscalationsAsync(int ticketId, CancellationToken ct)
+    {
+        if (!await db.Set<Ticket>().AnyAsync(t => t.Id == ticketId, ct))
+        {
+            return null;
+        }
+
+        return await (
+            from escalation in db.Set<TicketEscalation>().AsNoTracking()
+            where escalation.TicketId == ticketId
+            from fromAgent in db.Set<Agent>().Where(a => a.Id == escalation.FromAgentId).DefaultIfEmpty()
+            from toAgent in db.Set<Agent>().Where(a => a.Id == escalation.ToAgentId).DefaultIfEmpty()
+            orderby escalation.EscalatedAtUtc descending, escalation.Id descending
+            select new EscalationDto(
+                escalation.Id,
+                escalation.FromPriority,
+                escalation.ToPriority,
+                fromAgent == null ? null : new AgentSummaryDto(fromAgent.Id, fromAgent.FullName),
+                toAgent == null ? null : new AgentSummaryDto(toAgent.Id, toAgent.FullName),
+                escalation.FromDueAtUtc,
+                escalation.ToDueAtUtc,
+                escalation.Reason,
+                escalation.EscalatedBy,
+                escalation.EscalatedAtUtc))
+            .ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<TicketListItemDto>> GetForCustomerAsync(int customerId, CancellationToken ct)
     {
         var now = clock.UtcNow;

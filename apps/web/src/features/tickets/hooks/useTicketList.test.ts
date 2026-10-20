@@ -95,6 +95,8 @@ describe('useTicketList', () => {
     { assignedAgentId: 4 },
     { unassignedOnly: true },
     { sortBy: 'priority', sortDirection: 'desc' },
+    // Added with the Task 2 SLA filter: the hook needed no change to support it.
+    { slaStatus: 'Breached' },
   ])('requests immediately when %o changes', async (patch) => {
     const { result } = await renderSettled();
 

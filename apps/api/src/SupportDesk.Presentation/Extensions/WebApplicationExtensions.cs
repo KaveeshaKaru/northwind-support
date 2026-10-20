@@ -6,8 +6,9 @@ namespace SupportDesk.Presentation.Extensions;
 public static class WebApplicationExtensions
 {
     /// <summary>
-    /// Applies pending migrations and seeds the demo data. Development convenience only -
-    /// a real deployment would run migrations as a separate, deliberate step.
+    /// Applies pending migrations and seeds the demo data, when <c>Database:MigrateOnStartup</c>
+    /// is on. A local convenience - a real deployment runs migrations as a separate, deliberate
+    /// step before the new version starts.
     /// </summary>
     public static async Task MigrateAndSeedAsync(this WebApplication app)
     {

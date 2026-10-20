@@ -58,7 +58,7 @@ public sealed class AuthenticationTests(SupportDeskApiFactory factory) : IClassF
     }
 
     [Fact]
-    public void OnlyLogin_IsOpenToAnonymousCallers()
+    public void OnlyLoginAndHealth_AreOpenToAnonymousCallers()
     {
         // Guards the fallback policy: a new endpoint is protected unless someone opts it out.
         var anonymous = factory.Services.GetRequiredService<EndpointDataSource>().Endpoints
@@ -67,7 +67,16 @@ public sealed class AuthenticationTests(SupportDeskApiFactory factory) : IClassF
             .Select(endpoint => endpoint.RoutePattern.RawText)
             .ToList();
 
-        Assert.Equal(["api/auth/login"], anonymous);
+        Assert.Equal(["/health", "api/auth/login"], anonymous.Order(StringComparer.Ordinal).ToList());
+    }
+
+    [Fact]
+    public async Task Health_AnswersWithoutAToken_WhenTheDatabaseIsReachable()
+    {
+        var response = await factory.CreateClient().GetAsync("/health");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("Healthy", await response.Content.ReadAsStringAsync());
     }
 
     [Fact]

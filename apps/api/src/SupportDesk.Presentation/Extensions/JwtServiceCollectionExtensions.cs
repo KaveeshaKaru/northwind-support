@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 using SupportDesk.Infrastructure.Security;
 
@@ -8,7 +9,8 @@ public static class JwtServiceCollectionExtensions
 {
     /// <summary>
     /// Binds the <c>Jwt</c> section and makes bearer tokens the way callers authenticate. A
-    /// missing or short signing key stops the application at startup.
+    /// missing or short signing key stops the application at startup. Every endpoint needs a
+    /// valid token unless it is marked <c>[AllowAnonymous]</c>.
     /// </summary>
     public static IServiceCollection AddJwtAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
@@ -30,7 +32,11 @@ public static class JwtServiceCollectionExtensions
                 options.TokenValidationParameters = settings.ValidationParameters();
             });
 
-        services.AddAuthorization();
+        // The fallback applies to every endpoint without authorization metadata of its own, so a
+        // new endpoint is protected by default rather than by someone remembering [Authorize].
+        services.AddAuthorization(options => options.FallbackPolicy = new AuthorizationPolicyBuilder()
+            .RequireAuthenticatedUser()
+            .Build());
 
         return services;
     }

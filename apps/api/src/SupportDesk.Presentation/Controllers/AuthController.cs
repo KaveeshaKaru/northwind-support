@@ -24,7 +24,6 @@ public sealed class AuthController : ControllerBase
         handler.HandleAsync(request, ct);
 
     /// <summary>The agent the bearer token belongs to.</summary>
-    [Authorize]
     [HttpGet("me")]
     public Task<CurrentAgentDto> Me([FromServices] GetCurrentAgentQueryHandler handler, CancellationToken ct) =>
         handler.HandleAsync(User.AgentId(), ct);

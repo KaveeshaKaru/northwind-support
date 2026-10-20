@@ -25,7 +25,7 @@ builder.Services.AddCors(options => options.AddPolicy(
         .AllowAnyMethod()));
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerWithBearerToken();
 
 builder.Services.AddSlaRules(builder.Configuration);
 builder.Services.AddJwtAuthentication(builder.Configuration);

@@ -8,8 +8,7 @@ public class EscalateTicketRequestValidatorTests
 {
     private readonly EscalateTicketRequestValidator _validator = new();
 
-    private static EscalateTicketRequest Request(string reason = "Customer's site is down.", string escalatedBy = "alex.lead") =>
-        new(reason, escalatedBy);
+    private static EscalateTicketRequest Request(string reason = "Customer's site is down.") => new(reason);
 
     [Fact]
     public void AValidRequest_Passes() =>
@@ -37,14 +36,4 @@ public class EscalateTicketRequestValidatorTests
     [Fact]
     public void Reason_Missing_Fails() =>
         _validator.TestValidate(Request(reason: null!)).ShouldHaveValidationErrorFor(r => r.Reason);
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void EscalatedBy_Blank_Fails(string escalatedBy) =>
-        _validator.TestValidate(Request(escalatedBy: escalatedBy)).ShouldHaveValidationErrorFor(r => r.EscalatedBy);
-
-    [Fact]
-    public void EscalatedBy_LongerThan100_Fails() =>
-        _validator.TestValidate(Request(escalatedBy: new string('x', 101))).ShouldHaveValidationErrorFor(r => r.EscalatedBy);
 }

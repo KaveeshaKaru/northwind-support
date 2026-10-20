@@ -11,7 +11,7 @@ namespace SupportDesk.Application.Features.Tickets.Commands.EscalateTicket;
 
 /// <summary>
 /// Escalates a ticket (BR-7) through the same triage rules as a new ticket, and records who did
-/// it and why.
+/// it and why. Who did it is the signed-in agent, never a name taken from the request.
 /// </summary>
 public sealed class EscalateTicketCommandHandler(
     ITicketRepository tickets,
@@ -29,7 +29,8 @@ public sealed class EscalateTicketCommandHandler(
     /// <exception cref="BusinessRuleViolationException">
     /// The ticket is already Critical, or Resolved or Closed.
     /// </exception>
-    public async Task<TicketDetailDto> HandleAsync(int id, EscalateTicketRequest request, CancellationToken ct)
+    public async Task<TicketDetailDto> HandleAsync(
+        int id, EscalateTicketRequest request, string escalatedBy, CancellationToken ct)
     {
         var ticket = await tickets.GetByIdAsync(id, ct) ?? throw new NotFoundException("Ticket", id);
 
@@ -42,7 +43,7 @@ public sealed class EscalateTicketCommandHandler(
         var now = clock.UtcNow;
 
         var decision = triage.ForEscalation(ticket, category, customer.Tier, await agentWorkloads.GetAllAsync(ct), now);
-        var escalation = ticket.Escalate(decision, request.Reason, request.EscalatedBy, now);
+        var escalation = ticket.Escalate(decision, request.Reason, escalatedBy, now);
 
         await unitOfWork.SaveChangesAsync(ct);
 

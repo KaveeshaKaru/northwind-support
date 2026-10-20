@@ -18,10 +18,5 @@ public sealed class EscalateTicketRequestValidator : AbstractValidator<EscalateT
             .WithMessage("Give a reason for the escalation.")
             .Must(reason => reason.Trim().Length is >= MinLength and <= MaxLength)
             .WithMessage($"The reason must be between {MinLength} and {MaxLength} characters.");
-
-        RuleFor(x => x.EscalatedBy)
-            .NotEmpty()
-            .WithMessage("Say who is escalating the ticket.")
-            .MaximumLength(TicketEscalation.EscalatedByMaxLength);
     }
 }

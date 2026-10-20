@@ -9,7 +9,9 @@ describe('ticketsApi.getTickets', () => {
   });
 
   it('sends the SLA status filter to the API', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(page([])), { status: 200 }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify(page([])), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
     await ticketsApi.getTickets({ ...emptyFilters, slaStatus: 'AtRisk' });

@@ -40,7 +40,11 @@ export function CreateTicketPage() {
             >
               Open {created.reference}
             </button>
-            <button type="button" className="button button--ghost" onClick={() => setCreated(undefined)}>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={() => setCreated(undefined)}
+            >
               Raise another
             </button>
           </div>

@@ -83,7 +83,9 @@ export function TicketFilters({
             id="filter-priority"
             value={filters.priority ?? ''}
             onChange={(event) =>
-              onChange({ priority: (event.target.value || undefined) as TicketPriority | undefined })
+              onChange({
+                priority: (event.target.value || undefined) as TicketPriority | undefined,
+              })
             }
           >
             <option value="">All priorities</option>

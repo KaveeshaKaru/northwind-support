@@ -22,7 +22,9 @@ describe('TriageResult', () => {
     );
 
     expect(screen.getByText('Critical')).toBeInTheDocument();
-    expect(screen.getByText("Category 'Security' is always treated as Critical")).toBeInTheDocument();
+    expect(
+      screen.getByText("Category 'Security' is always treated as Critical"),
+    ).toBeInTheDocument();
     expect(screen.getByText(/2026/)).toBeInTheDocument();
     expect(screen.getByText(/2h window/)).toBeInTheDocument();
     expect(screen.getByText('Priya Nair')).toBeInTheDocument();

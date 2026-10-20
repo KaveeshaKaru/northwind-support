@@ -1,0 +1,18 @@
+# Only what the API image needs goes into the build context. Starting from "nothing" and
+# adding back means a new file in the repository - a secret, a dump, a log - stays out
+# unless someone deliberately lets it in.
+*
+!global.json
+!Directory.Build.props
+!Directory.Packages.props
+!apps/api/src/
+
+# Build output from the host would clash with the build inside the image.
+**/bin/
+**/obj/
+
+# Never part of the image, even if the rules above change.
+.git/
+.env
+**/node_modules/
+apps/web/

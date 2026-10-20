@@ -79,6 +79,17 @@ export interface TicketDetail {
   dueAtUtc: string | null;
   resolvedAtUtc: string | null;
   slaStatus: SlaStatus;
+  /** Only in the response to the call that triaged the ticket (create or escalate). */
+  triage?: Triage;
+}
+
+/** What triage decided about a ticket, with a human-readable reason for each part. */
+export interface Triage {
+  appliedPriority: TicketPriority;
+  priorityReason: string;
+  slaWindowHours: number;
+  slaReason: string;
+  assignmentReason: string;
 }
 
 /** Everything the ticket list screen can narrow the results by. */

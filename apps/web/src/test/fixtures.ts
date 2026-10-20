@@ -1,4 +1,4 @@
-import type { PagedResult, TicketListItem } from '../types/api';
+import type { PagedResult, TicketDetail, TicketListItem } from '../types/api';
 
 /** A list row with sensible defaults, so tests only state what they care about. */
 export function ticketListItem(overrides: Partial<TicketListItem> = {}): TicketListItem {
@@ -27,5 +27,32 @@ export function page(items: TicketListItem[]): PagedResult<TicketListItem> {
     pageSize: 20,
     totalCount: items.length,
     totalPages: 1,
+  };
+}
+
+/** A ticket as the detail endpoint returns it, with sensible defaults. */
+export function ticketDetail(overrides: Partial<TicketDetail> = {}): TicketDetail {
+  return {
+    id: 43,
+    reference: 'TCK-0043',
+    title: 'Wrong invoice',
+    description: 'Invoice total is wrong.',
+    status: 'New',
+    priority: 'High',
+    customer: {
+      id: 2,
+      name: 'Fabrikam Inc',
+      tier: 'Standard',
+      email: 'helpdesk@fabrikam.example',
+      phone: null,
+    },
+    category: { id: 2, name: 'Billing', requiresSpecialist: true },
+    assignedAgent: { id: 4, fullName: 'Sara Lindqvist' },
+    createdAtUtc: '2026-10-19T21:36:46Z',
+    updatedAtUtc: '2026-10-19T21:36:46Z',
+    dueAtUtc: '2026-10-20T05:36:46Z',
+    resolvedAtUtc: null,
+    slaStatus: 'WithinSla',
+    ...overrides,
   };
 }

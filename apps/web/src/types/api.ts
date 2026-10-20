@@ -99,9 +99,9 @@ export interface Escalation {
   escalatedAtUtc: string;
 }
 
+/** Who is escalating is not sent: the API takes it from the signed-in agent's token. */
 export interface EscalateTicketPayload {
   reason: string;
-  escalatedBy: string;
 }
 
 /** What triage decided about a ticket, with a human-readable reason for each part. */
@@ -182,4 +182,23 @@ export interface ProblemDetails {
   detail?: string;
   traceId?: string;
   errors?: Record<string, string[]>;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+/** The signed-in agent. */
+export interface CurrentAgent {
+  id: number;
+  fullName: string;
+  email: string;
+}
+
+/** A successful sign-in: the bearer token, when it stops working, and who it is for. */
+export interface LoginResponse {
+  token: string;
+  expiresAtUtc: string;
+  agent: CurrentAgent;
 }

@@ -4,7 +4,6 @@ import { ticketsApi } from '../../../api/tickets';
 import { Field } from '../../../components/Field';
 import type { EscalateTicketPayload, TicketDetail } from '../../../types/api';
 import {
-  ESCALATED_BY_MAX_LENGTH,
   REASON_MAX_LENGTH,
   REASON_MIN_LENGTH,
   escalationBlocker,
@@ -16,7 +15,7 @@ interface EscalationPanelProps {
   onEscalated: (ticket: TicketDetail) => void;
 }
 
-const emptyForm: EscalateTicketPayload = { reason: '', escalatedBy: '' };
+const emptyForm: EscalateTicketPayload = { reason: '' };
 
 /**
  * Escalates a ticket with a reason. Checks the API's rules first so an invalid request never
@@ -45,10 +44,7 @@ export function EscalationPanel({ ticket, onEscalated }: EscalationPanelProps) {
     setIsSaving(true);
 
     try {
-      const escalated = await ticketsApi.escalate(ticket.id, {
-        reason: form.reason.trim(),
-        escalatedBy: form.escalatedBy.trim(),
-      });
+      const escalated = await ticketsApi.escalate(ticket.id, { reason: form.reason.trim() });
       setForm(emptyForm);
       onEscalated(escalated);
     } catch (caught) {
@@ -78,48 +74,28 @@ export function EscalationPanel({ ticket, onEscalated }: EscalationPanelProps) {
       )}
 
       {!blocker && (
-        <>
-          <Field
-            id="escalation-reason"
-            label="Reason"
-            error={errors.reason}
-            hint={`Between ${REASON_MIN_LENGTH} and ${REASON_MAX_LENGTH} characters.`}
-          >
-            {(fieldProps) => (
-              <textarea
-                {...fieldProps}
-                rows={3}
-                value={form.reason}
-                maxLength={REASON_MAX_LENGTH}
-                disabled={isSaving}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    reason: event.target.value,
-                  }))
-                }
-              />
-            )}
-          </Field>
-
-          <Field id="escalation-by" label="Escalated by" error={errors.escalatedBy}>
-            {(fieldProps) => (
-              <input
-                {...fieldProps}
-                type="text"
-                value={form.escalatedBy}
-                maxLength={ESCALATED_BY_MAX_LENGTH}
-                disabled={isSaving}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    escalatedBy: event.target.value,
-                  }))
-                }
-              />
-            )}
-          </Field>
-        </>
+        <Field
+          id="escalation-reason"
+          label="Reason"
+          error={errors.reason}
+          hint={`Between ${REASON_MIN_LENGTH} and ${REASON_MAX_LENGTH} characters.`}
+        >
+          {(fieldProps) => (
+            <textarea
+              {...fieldProps}
+              rows={3}
+              value={form.reason}
+              maxLength={REASON_MAX_LENGTH}
+              disabled={isSaving}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  reason: event.target.value,
+                }))
+              }
+            />
+          )}
+        </Field>
       )}
 
       {submitError && (

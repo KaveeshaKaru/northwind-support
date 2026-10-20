@@ -3,7 +3,6 @@ import type { EscalateTicketPayload, TicketDetail } from '../../types/api';
 /** The same limits the API enforces, so an invalid escalation never reaches it. */
 export const REASON_MIN_LENGTH = 5;
 export const REASON_MAX_LENGTH = 500;
-export const ESCALATED_BY_MAX_LENGTH = 100;
 
 /** Why a ticket cannot be escalated, and what the agent can do instead. */
 export interface EscalationBlocker {
@@ -44,14 +43,6 @@ export function validateEscalation(
 
   if (reason.length < REASON_MIN_LENGTH || reason.length > REASON_MAX_LENGTH) {
     errors.reason = `The reason must be between ${REASON_MIN_LENGTH} and ${REASON_MAX_LENGTH} characters.`;
-  }
-
-  const escalatedBy = form.escalatedBy.trim();
-
-  if (escalatedBy.length === 0) {
-    errors.escalatedBy = 'Say who is escalating the ticket.';
-  } else if (escalatedBy.length > ESCALATED_BY_MAX_LENGTH) {
-    errors.escalatedBy = `At most ${ESCALATED_BY_MAX_LENGTH} characters.`;
   }
 
   return errors;

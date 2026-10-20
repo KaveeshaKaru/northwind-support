@@ -14,10 +14,9 @@ vi.mock('../../../api/tickets', () => ({
 
 const escalate = vi.mocked(ticketsApi.escalate);
 
-async function fillIn(reason: string, escalatedBy = 'alex.lead') {
+async function fillIn(reason: string) {
   const user = userEvent.setup();
   await user.type(screen.getByLabelText('Reason'), reason);
-  await user.type(screen.getByLabelText('Escalated by'), escalatedBy);
   await user.click(screen.getByRole('button', { name: 'Escalate' }));
 }
 
@@ -60,11 +59,14 @@ describe('EscalationPanel', () => {
 
     await fillIn('  Customer is very unhappy.  ');
 
-    expect(escalate).toHaveBeenCalledWith(43, {
-      reason: 'Customer is very unhappy.',
-      escalatedBy: 'alex.lead',
-    });
+    expect(escalate).toHaveBeenCalledWith(43, { reason: 'Customer is very unhappy.' });
     expect(onEscalated).toHaveBeenCalledWith(escalated);
+  });
+
+  it('does not ask who is escalating - the API records the signed-in agent', () => {
+    render(<EscalationPanel ticket={ticketDetail()} onEscalated={vi.fn()} />);
+
+    expect(screen.queryByLabelText('Escalated by')).not.toBeInTheDocument();
   });
 
   it.each([

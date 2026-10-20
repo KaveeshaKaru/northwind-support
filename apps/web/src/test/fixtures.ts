@@ -1,4 +1,4 @@
-import type { PagedResult, TicketDetail, TicketListItem } from '../types/api';
+import type { LoginResponse, PagedResult, TicketDetail, TicketListItem } from '../types/api';
 
 /** A list row with sensible defaults, so tests only state what they care about. */
 export function ticketListItem(overrides: Partial<TicketListItem> = {}): TicketListItem {
@@ -53,6 +53,16 @@ export function ticketDetail(overrides: Partial<TicketDetail> = {}): TicketDetai
     dueAtUtc: '2026-10-20T05:36:46Z',
     resolvedAtUtc: null,
     slaStatus: 'WithinSla',
+    ...overrides,
+  };
+}
+
+/** A successful sign-in as Sara, with a token that is still valid. */
+export function signedInAs(overrides: Partial<LoginResponse> = {}): LoginResponse {
+  return {
+    token: 'test-token',
+    expiresAtUtc: '2099-01-01T00:00:00Z',
+    agent: { id: 4, fullName: 'Sara Lindqvist', email: 'sara.lindqvist@northwind-support.example' },
     ...overrides,
   };
 }

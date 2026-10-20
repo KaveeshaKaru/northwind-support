@@ -81,6 +81,27 @@ export interface TicketDetail {
   slaStatus: SlaStatus;
   /** Only in the response to the call that triaged the ticket (create or escalate). */
   triage?: Triage;
+  /** Only in the response to an escalation: the change just recorded. */
+  escalation?: Escalation;
+}
+
+/** One escalation of a ticket: what changed, who did it and why. */
+export interface Escalation {
+  id: number;
+  fromPriority: TicketPriority;
+  toPriority: TicketPriority;
+  fromAgent: AgentSummary | null;
+  toAgent: AgentSummary | null;
+  fromDueAtUtc: string | null;
+  toDueAtUtc: string | null;
+  reason: string;
+  escalatedBy: string;
+  escalatedAtUtc: string;
+}
+
+export interface EscalateTicketPayload {
+  reason: string;
+  escalatedBy: string;
 }
 
 /** What triage decided about a ticket, with a human-readable reason for each part. */

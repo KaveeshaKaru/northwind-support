@@ -23,14 +23,26 @@ public sealed class SupportDbSeeder(
     SupportDbContext db,
     IClock clock,
     SlaSettings sla,
+    IPasswordHasher passwordHasher,
     ILogger<SupportDbSeeder> logger)
 {
-    /// <summary>Seeds the database, unless it already has tickets in it.</summary>
+    /// <summary>
+    /// The password every seeded agent signs in with. A local development fixture - never a
+    /// real credential - and only its hash is stored.
+    /// </summary>
+    public const string DevelopmentPassword = "LocalDev-Only-Password1!";
+
+    /// <summary>
+    /// Seeds the database, unless it already has tickets in it. Either way, any agent still
+    /// without a password gets the development one, so a database seeded before sign-in existed
+    /// can be logged into too.
+    /// </summary>
     public async Task SeedAsync(CancellationToken ct = default)
     {
         if (await db.Set<Ticket>().AnyAsync(ct))
         {
             logger.LogInformation("Seed data already present; skipping.");
+            await SeedMissingPasswordsAsync(ct);
             return;
         }
 
@@ -42,6 +54,11 @@ public sealed class SupportDbSeeder(
 
         db.AddRange(categories);
         db.AddRange(customers);
+        foreach (var agent in agents)
+        {
+            agent.SetPasswordHash(passwordHasher.Hash(DevelopmentPassword));
+        }
+
         db.AddRange(agents);
         await db.SaveChangesAsync(ct);
 
@@ -54,6 +71,22 @@ public sealed class SupportDbSeeder(
         logger.LogInformation(
             "Seeded {Categories} categories, {Customers} customers, {Agents} agents and {Tickets} tickets.",
             categories.Count, customers.Count, agents.Count, await db.Set<Ticket>().CountAsync(ct));
+    }
+
+    private async Task SeedMissingPasswordsAsync(CancellationToken ct)
+    {
+        var agents = await db.Set<Agent>().Where(a => a.PasswordHash == null).ToListAsync(ct);
+
+        foreach (var agent in agents)
+        {
+            agent.SetPasswordHash(passwordHasher.Hash(DevelopmentPassword));
+        }
+
+        if (agents.Count > 0)
+        {
+            await db.SaveChangesAsync(ct);
+            logger.LogInformation("Set the development password for {Count} agents.", agents.Count);
+        }
     }
 
     private static List<Category> SeedCategories() =>

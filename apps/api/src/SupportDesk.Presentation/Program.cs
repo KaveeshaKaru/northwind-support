@@ -28,6 +28,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddSlaRules(builder.Configuration);
+builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -45,6 +46,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors(FrontendCorsPolicy);
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 

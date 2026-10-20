@@ -12,8 +12,21 @@ public sealed class AgentPasswordHasher : Application.Abstractions.IPasswordHash
 {
     private readonly PasswordHasher<Agent> _hasher = new();
 
+    /// <summary>
+    /// Checked when there is no real hash (unknown email, no password set), so that answer takes
+    /// as long as a wrong password does. Its password is random and thrown away.
+    /// </summary>
+    private readonly string _decoyHash;
+
+    public AgentPasswordHasher() => _decoyHash = Hash(Guid.NewGuid().ToString());
+
     public string Hash(string password) => _hasher.HashPassword(user: null!, password);
 
-    public bool Verify(string hash, string password) =>
-        _hasher.VerifyHashedPassword(user: null!, hash, password) is not PasswordVerificationResult.Failed;
+    public bool Verify(string? hash, string password)
+    {
+        var matches = _hasher.VerifyHashedPassword(user: null!, hash ?? _decoyHash, password)
+            is not PasswordVerificationResult.Failed;
+
+        return hash is not null && matches;
+    }
 }

@@ -8,5 +8,9 @@ public interface IPasswordHasher
 {
     string Hash(string password);
 
-    bool Verify(string hash, string password);
+    /// <summary>
+    /// True when <paramref name="password"/> matches <paramref name="hash"/>. With no hash it
+    /// still does the same work before saying no, so callers cannot be timed.
+    /// </summary>
+    bool Verify(string? hash, string password);
 }

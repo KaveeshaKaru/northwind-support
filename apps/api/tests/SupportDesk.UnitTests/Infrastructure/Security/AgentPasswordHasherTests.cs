@@ -30,4 +30,8 @@ public class AgentPasswordHasherTests
     [InlineData("")]
     public void Verify_AnyOtherPassword_Fails(string attempt) =>
         Assert.False(_hasher.Verify(_hasher.Hash(Password), attempt));
+
+    [Fact]
+    public void Verify_WithNoStoredHash_FailsAfterDoingTheSameWork() =>
+        Assert.False(_hasher.Verify(null, Password));
 }

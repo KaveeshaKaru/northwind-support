@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using SupportDesk.Domain.Aggregates.Agents;
 using SupportDesk.Domain.Aggregates.Categories;
 using SupportDesk.Domain.Aggregates.Customers;
@@ -22,7 +23,8 @@ internal sealed class SqliteSupportDatabase : IDisposable
 {
     private readonly SqliteConnection _connection;
 
-    public SqliteSupportDatabase()
+    /// <param name="interceptors">Optional EF interceptors, e.g. to record the SQL a query sends.</param>
+    public SqliteSupportDatabase(params IInterceptor[] interceptors)
     {
         // The in-memory database lives as long as this connection stays open.
         _connection = new SqliteConnection("DataSource=:memory:");
@@ -30,6 +32,7 @@ internal sealed class SqliteSupportDatabase : IDisposable
 
         var options = new DbContextOptionsBuilder<SupportDbContext>()
             .UseSqlite(_connection)
+            .AddInterceptors(interceptors)
             .Options;
 
         Db = new SupportDbContext(options);
@@ -90,7 +93,8 @@ internal sealed class SqliteSupportDatabase : IDisposable
         DateTime dueAtUtc,
         DateTime atRiskFromUtc,
         DateTime? resolvedAtUtc = null,
-        TicketPriority priority = TicketPriority.Medium)
+        TicketPriority priority = TicketPriority.Medium,
+        Agent? agent = null)
     {
         var ticket = Ticket.Raise(
             reference, "Something is not working", "A description long enough to be realistic.",
@@ -100,7 +104,7 @@ internal sealed class SqliteSupportDatabase : IDisposable
             new TriageDecision(
                 priority, "Test",
                 new SlaTerms(dueAtUtc - atRiskFromUtc, dueAtUtc, atRiskFromUtc, "Test"),
-                new AssignmentDecision(null, "Test")),
+                new AssignmentDecision(agent?.Id, "Test")),
             FixedClock.DefaultNow);
 
         if (resolvedAtUtc is { } resolved)

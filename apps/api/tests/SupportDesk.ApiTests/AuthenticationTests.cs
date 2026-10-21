@@ -23,6 +23,7 @@ public sealed class AuthenticationTests(SupportDeskApiFactory factory) : IClassF
         "/api/customers/1",
         "/api/categories",
         "/api/auth/me",
+        "/api/reports/sla-summary?from=2000-01-01&to=2100-01-01&groupBy=priority",
     ];
 
     [Theory]

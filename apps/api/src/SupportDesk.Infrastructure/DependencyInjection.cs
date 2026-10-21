@@ -44,6 +44,7 @@ public static class DependencyInjection
         services.AddScoped<IAgentQueries, AgentQueries>();
         services.AddScoped<ICategoryQueries, CategoryQueries>();
         services.AddScoped<IAgentWorkloads, AgentWorkloads>();
+        services.AddScoped<ISlaReportQueries, SlaReportQueries>();
 
         services.AddScoped<SupportDbSeeder>();
 

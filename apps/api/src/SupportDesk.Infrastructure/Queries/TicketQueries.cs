@@ -213,21 +213,11 @@ public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQu
     /// </summary>
     private static Expression<Func<TicketWithLabels, bool>> HasSlaStatus(SlaStatus status, DateTime nowUtc)
     {
-        var rule = SlaEvaluator.Rule;
         var row = Expression.Parameter(typeof(TicketWithLabels), "x");
-        var ticket = Expression.Property(row, nameof(TicketWithLabels.Ticket));
+        var statusOfTicket = SlaStatusSql.StatusOf(Expression.Property(row, nameof(TicketWithLabels.Ticket)), nowUtc);
 
-        // Captured values rather than constants, so they reach SQL as parameters.
-        Expression<Func<DateTime>> now = () => nowUtc;
+        // A captured value rather than a constant, so it reaches SQL as a parameter.
         Expression<Func<SlaStatus>> wanted = () => status;
-
-        var statusOfTicket = new ParameterReplacer(new Dictionary<ParameterExpression, Expression>
-        {
-            [rule.Parameters[0]] = Expression.Property(ticket, nameof(Ticket.DueAtUtc)),
-            [rule.Parameters[1]] = Expression.Property(ticket, nameof(Ticket.AtRiskFromUtc)),
-            [rule.Parameters[2]] = Expression.Property(ticket, nameof(Ticket.ResolvedAtUtc)),
-            [rule.Parameters[3]] = now.Body
-        }).Visit(rule.Body);
 
         return Expression.Lambda<Func<TicketWithLabels, bool>>(Expression.Equal(statusOfTicket, wanted.Body), row);
     }

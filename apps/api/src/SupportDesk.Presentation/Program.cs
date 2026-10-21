@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using SupportDesk.Application;
 using SupportDesk.Infrastructure;
+using SupportDesk.Infrastructure.Data;
 using SupportDesk.Presentation.Extensions;
 using SupportDesk.Presentation.Filters;
 using SupportDesk.Presentation.Middleware;
@@ -25,10 +26,16 @@ builder.Services.AddCors(options => options.AddPolicy(
         .AllowAnyMethod()));
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerWithBearerToken();
 
+builder.Services.AddSlaRules(builder.Configuration);
+builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// Healthy only when the database answers, so a load balancer or orchestrator stops sending
+// traffic to an API that cannot do its job.
+builder.Services.AddHealthChecks().AddDbContextCheck<SupportDbContext>();
 
 var app = builder.Build();
 
@@ -38,13 +45,22 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+}
 
-    // Keeps a developer machine one command away from a working database.
+// Changing the database is a deliberate setting, not a side effect of the environment name: on
+// in appsettings.Development.json and docker-compose.yml, so one command gives a working
+// database; off by default, so a real deployment migrates as its own step.
+if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+{
     await app.MigrateAndSeedAsync();
 }
 
 app.UseCors(FrontendCorsPolicy);
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.MapControllers();
+app.MapHealthChecks("/health").AllowAnonymous();
 
 app.Run();

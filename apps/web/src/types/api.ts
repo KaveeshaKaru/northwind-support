@@ -79,6 +79,38 @@ export interface TicketDetail {
   dueAtUtc: string | null;
   resolvedAtUtc: string | null;
   slaStatus: SlaStatus;
+  /** Only in the response to the call that triaged the ticket (create or escalate). */
+  triage?: Triage;
+  /** Only in the response to an escalation: the change just recorded. */
+  escalation?: Escalation;
+}
+
+/** One escalation of a ticket: what changed, who did it and why. */
+export interface Escalation {
+  id: number;
+  fromPriority: TicketPriority;
+  toPriority: TicketPriority;
+  fromAgent: AgentSummary | null;
+  toAgent: AgentSummary | null;
+  fromDueAtUtc: string | null;
+  toDueAtUtc: string | null;
+  reason: string;
+  escalatedBy: string;
+  escalatedAtUtc: string;
+}
+
+/** Who is escalating is not sent: the API takes it from the signed-in agent's token. */
+export interface EscalateTicketPayload {
+  reason: string;
+}
+
+/** What triage decided about a ticket, with a human-readable reason for each part. */
+export interface Triage {
+  appliedPriority: TicketPriority;
+  priorityReason: string;
+  slaWindowHours: number;
+  slaReason: string;
+  assignmentReason: string;
 }
 
 /** Everything the ticket list screen can narrow the results by. */
@@ -90,6 +122,7 @@ export interface TicketFilters {
   customerId?: number;
   assignedAgentId?: number;
   unassignedOnly?: boolean;
+  slaStatus?: SlaStatus;
   page: number;
   pageSize: number;
   sortBy: TicketSortField;
@@ -149,4 +182,23 @@ export interface ProblemDetails {
   detail?: string;
   traceId?: string;
   errors?: Record<string, string[]>;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+/** The signed-in agent. */
+export interface CurrentAgent {
+  id: number;
+  fullName: string;
+  email: string;
+}
+
+/** A successful sign-in: the bearer token, when it stops working, and who it is for. */
+export interface LoginResponse {
+  token: string;
+  expiresAtUtc: string;
+  agent: CurrentAgent;
 }

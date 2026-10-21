@@ -5,6 +5,7 @@ using SupportDesk.Domain.Aggregates.Agents;
 using SupportDesk.Domain.Aggregates.Categories;
 using SupportDesk.Domain.Aggregates.Customers;
 using SupportDesk.Domain.Aggregates.Tickets;
+using SupportDesk.Domain.Aggregates.Tickets.Triage;
 
 namespace SupportDesk.Infrastructure.Data;
 
@@ -14,17 +15,34 @@ namespace SupportDesk.Infrastructure.Data;
 /// produce the same database.
 /// </summary>
 /// <remarks>
-/// Every aggregate is built through its own behaviour. The two historical values no behaviour
-/// produces - a ticket's last update and its due date - are set through EF Core directly.
+/// Every aggregate is built through its own behaviour. The historical values no behaviour
+/// produces - a ticket's last update, its due date and when it became at risk - are set through
+/// EF Core directly.
 /// </remarks>
-public sealed class SupportDbSeeder(SupportDbContext db, IClock clock, ILogger<SupportDbSeeder> logger)
+public sealed class SupportDbSeeder(
+    SupportDbContext db,
+    IClock clock,
+    SlaSettings sla,
+    IPasswordHasher passwordHasher,
+    ILogger<SupportDbSeeder> logger)
 {
-    /// <summary>Seeds the database, unless it already has tickets in it.</summary>
+    /// <summary>
+    /// The password every seeded agent signs in with. A local development fixture - never a
+    /// real credential - and only its hash is stored.
+    /// </summary>
+    public const string DevelopmentPassword = "LocalDev-Only-Password1!";
+
+    /// <summary>
+    /// Seeds the database, unless it already has tickets in it. Either way, any agent still
+    /// without a password gets the development one, so a database seeded before sign-in existed
+    /// can be logged into too.
+    /// </summary>
     public async Task SeedAsync(CancellationToken ct = default)
     {
         if (await db.Set<Ticket>().AnyAsync(ct))
         {
             logger.LogInformation("Seed data already present; skipping.");
+            await SeedMissingPasswordsAsync(ct);
             return;
         }
 
@@ -36,6 +54,11 @@ public sealed class SupportDbSeeder(SupportDbContext db, IClock clock, ILogger<S
 
         db.AddRange(categories);
         db.AddRange(customers);
+        foreach (var agent in agents)
+        {
+            agent.SetPasswordHash(passwordHasher.Hash(DevelopmentPassword));
+        }
+
         db.AddRange(agents);
         await db.SaveChangesAsync(ct);
 
@@ -48,6 +71,22 @@ public sealed class SupportDbSeeder(SupportDbContext db, IClock clock, ILogger<S
         logger.LogInformation(
             "Seeded {Categories} categories, {Customers} customers, {Agents} agents and {Tickets} tickets.",
             categories.Count, customers.Count, agents.Count, await db.Set<Ticket>().CountAsync(ct));
+    }
+
+    private async Task SeedMissingPasswordsAsync(CancellationToken ct)
+    {
+        var agents = await db.Set<Agent>().Where(a => a.PasswordHash == null).ToListAsync(ct);
+
+        foreach (var agent in agents)
+        {
+            agent.SetPasswordHash(passwordHasher.Hash(DevelopmentPassword));
+        }
+
+        if (agents.Count > 0)
+        {
+            await db.SaveChangesAsync(ct);
+            logger.LogInformation("Set the development password for {Count} agents.", agents.Count);
+        }
     }
 
     private static List<Category> SeedCategories() =>
@@ -194,7 +233,11 @@ public sealed class SupportDbSeeder(SupportDbContext db, IClock clock, ILogger<S
             var entry = db.Add(ticket);
             entry.Property(t => t.UpdatedAtUtc).CurrentValue =
                 createdAtUtc.AddMinutes(row.ResolvedAfterMinutes ?? row.CreatedMinutesAgo / 2);
-            entry.Property(t => t.DueAtUtc).CurrentValue = createdAtUtc.AddMinutes(row.SlaWindowMinutes);
+            var window = TimeSpan.FromMinutes(row.SlaWindowMinutes);
+            var dueAtUtc = createdAtUtc + window;
+            entry.Property(t => t.DueAtUtc).CurrentValue = dueAtUtc;
+            entry.Property(t => t.AtRiskFromUtc).CurrentValue =
+                dueAtUtc - window * (sla.AtRiskThresholdPercent / 100);
         }
     }
 

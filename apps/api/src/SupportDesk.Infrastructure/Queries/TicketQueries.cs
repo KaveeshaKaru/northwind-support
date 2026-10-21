@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using SupportDesk.Application.Abstractions;
 using SupportDesk.Application.Contracts.Common;
@@ -17,17 +18,17 @@ namespace SupportDesk.Infrastructure.Queries;
 public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQueries
 {
     /// <remarks>
-    /// Sorts and pages every ticket. The filter values bound into <paramref name="query"/>
-    /// (search, status, priority, category, customer, agent, unassigned-only) are not applied
-    /// yet: server-side filtering is still to be built.
+    /// Filters, counts, sorts and pages in the database: the filters are applied before the
+    /// count, so the total and the page always describe the same set.
     /// </remarks>
     public async Task<PagedResult<TicketListItemDto>> GetPagedAsync(TicketQuery query, CancellationToken ct)
     {
-        var tickets = TicketsWithLabels();
+        // One "now" for the whole request, so the filter and the status shown agree.
+        var now = clock.UtcNow;
+
+        var tickets = ApplyFilters(TicketsWithLabels(), query, now);
 
         var totalCount = await tickets.CountAsync(ct);
-
-        var now = clock.UtcNow;
 
         var items = await ApplySort(tickets, query)
             .Skip((query.Page - 1) * query.PageSize)
@@ -46,7 +47,7 @@ public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQu
                 UpdatedAtUtc = x.Ticket.UpdatedAtUtc,
                 DueAtUtc = x.Ticket.DueAtUtc,
                 ResolvedAtUtc = x.Ticket.ResolvedAtUtc,
-                SlaStatus = SlaEvaluator.Evaluate(x.Ticket.DueAtUtc, x.Ticket.ResolvedAtUtc, now)
+                SlaStatus = SlaEvaluator.Evaluate(x.Ticket.DueAtUtc, x.Ticket.AtRiskFromUtc, x.Ticket.ResolvedAtUtc, now)
             })
             .ToListAsync(ct);
 
@@ -75,9 +76,40 @@ public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQu
                 UpdatedAtUtc = x.Ticket.UpdatedAtUtc,
                 DueAtUtc = x.Ticket.DueAtUtc,
                 ResolvedAtUtc = x.Ticket.ResolvedAtUtc,
-                SlaStatus = SlaEvaluator.Evaluate(x.Ticket.DueAtUtc, x.Ticket.ResolvedAtUtc, now)
+                SlaStatus = SlaEvaluator.Evaluate(x.Ticket.DueAtUtc, x.Ticket.AtRiskFromUtc, x.Ticket.ResolvedAtUtc, now)
             })
             .FirstOrDefaultAsync(ct);
+    }
+
+    /// <remarks>
+    /// Reads through IX_TicketEscalations_TicketId_EscalatedAtUtc, which already holds a
+    /// ticket's rows newest first. Agent names are joined in, both sides optional.
+    /// </remarks>
+    public async Task<IReadOnlyList<EscalationDto>?> GetEscalationsAsync(int ticketId, CancellationToken ct)
+    {
+        if (!await db.Set<Ticket>().AnyAsync(t => t.Id == ticketId, ct))
+        {
+            return null;
+        }
+
+        return await (
+            from escalation in db.Set<TicketEscalation>().AsNoTracking()
+            where escalation.TicketId == ticketId
+            from fromAgent in db.Set<Agent>().Where(a => a.Id == escalation.FromAgentId).DefaultIfEmpty()
+            from toAgent in db.Set<Agent>().Where(a => a.Id == escalation.ToAgentId).DefaultIfEmpty()
+            orderby escalation.EscalatedAtUtc descending, escalation.Id descending
+            select new EscalationDto(
+                escalation.Id,
+                escalation.FromPriority,
+                escalation.ToPriority,
+                fromAgent == null ? null : new AgentSummaryDto(fromAgent.Id, fromAgent.FullName),
+                toAgent == null ? null : new AgentSummaryDto(toAgent.Id, toAgent.FullName),
+                escalation.FromDueAtUtc,
+                escalation.ToDueAtUtc,
+                escalation.Reason,
+                escalation.EscalatedBy,
+                escalation.EscalatedAtUtc))
+            .ToListAsync(ct);
     }
 
     public async Task<IReadOnlyList<TicketListItemDto>> GetForCustomerAsync(int customerId, CancellationToken ct)
@@ -102,7 +134,7 @@ public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQu
                 UpdatedAtUtc = x.Ticket.UpdatedAtUtc,
                 DueAtUtc = x.Ticket.DueAtUtc,
                 ResolvedAtUtc = x.Ticket.ResolvedAtUtc,
-                SlaStatus = SlaEvaluator.Evaluate(x.Ticket.DueAtUtc, x.Ticket.ResolvedAtUtc, now)
+                SlaStatus = SlaEvaluator.Evaluate(x.Ticket.DueAtUtc, x.Ticket.AtRiskFromUtc, x.Ticket.ResolvedAtUtc, now)
             })
             .ToListAsync(ct);
     }
@@ -116,6 +148,79 @@ public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQu
         join category in db.Set<Category>() on ticket.CategoryId equals category.Id
         from agent in db.Set<Agent>().Where(a => a.Id == ticket.AssignedAgentId).DefaultIfEmpty()
         select new TicketWithLabels { Ticket = ticket, Customer = customer, Category = category, Agent = agent };
+
+    /// <summary>
+    /// Narrows the list to the filters that were supplied, combined with AND. Each filter is one
+    /// condition here, translated to SQL; a new filter is one more <c>if</c>.
+    /// </summary>
+    private static IQueryable<TicketWithLabels> ApplyFilters(
+        IQueryable<TicketWithLabels> source,
+        TicketQuery query,
+        DateTime nowUtc)
+    {
+        if (query.Status is { } status)
+        {
+            source = source.Where(x => x.Ticket.Status == status);
+        }
+
+        if (query.Priority is { } priority)
+        {
+            source = source.Where(x => x.Ticket.Priority == priority);
+        }
+
+        if (query.CategoryId is { } categoryId)
+        {
+            source = source.Where(x => x.Ticket.CategoryId == categoryId);
+        }
+
+        if (query.CustomerId is { } customerId)
+        {
+            source = source.Where(x => x.Ticket.CustomerId == customerId);
+        }
+
+        if (query.AssignedAgentId is { } agentId)
+        {
+            source = source.Where(x => x.Ticket.AssignedAgentId == agentId);
+        }
+
+        if (query.UnassignedOnly)
+        {
+            source = source.Where(x => x.Ticket.AssignedAgentId == null);
+        }
+
+        var search = query.Search?.Trim();
+
+        if (!string.IsNullOrEmpty(search))
+        {
+            source = source.Where(x =>
+                x.Ticket.Title.Contains(search) ||
+                x.Ticket.Reference.Contains(search) ||
+                x.Customer.Name.Contains(search));
+        }
+
+        if (query.SlaStatus is { } slaStatus)
+        {
+            source = source.Where(HasSlaStatus(slaStatus, nowUtc));
+        }
+
+        return source;
+    }
+
+    /// <summary>
+    /// <see cref="SlaEvaluator.Rule"/> applied to the ticket's own columns and compared with
+    /// <paramref name="status"/>: the same rule that decides the status shown, so the filter and
+    /// the list cannot disagree. EF Core translates it to a CASE expression in the WHERE clause.
+    /// </summary>
+    private static Expression<Func<TicketWithLabels, bool>> HasSlaStatus(SlaStatus status, DateTime nowUtc)
+    {
+        var row = Expression.Parameter(typeof(TicketWithLabels), "x");
+        var statusOfTicket = SlaStatusSql.StatusOf(Expression.Property(row, nameof(TicketWithLabels.Ticket)), nowUtc);
+
+        // A captured value rather than a constant, so it reaches SQL as a parameter.
+        Expression<Func<SlaStatus>> wanted = () => status;
+
+        return Expression.Lambda<Func<TicketWithLabels, bool>>(Expression.Equal(statusOfTicket, wanted.Body), row);
+    }
 
     private static IQueryable<TicketWithLabels> ApplySort(IQueryable<TicketWithLabels> source, TicketQuery query)
     {

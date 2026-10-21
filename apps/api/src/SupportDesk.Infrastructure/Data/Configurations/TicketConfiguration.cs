@@ -39,6 +39,8 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
 
         builder.Property(t => t.DueAtUtc).HasColumnType("datetime2(3)");
 
+        builder.Property(t => t.AtRiskFromUtc).HasColumnType("datetime2(3)");
+
         builder.Property(t => t.ResolvedAtUtc).HasColumnType("datetime2(3)");
 
         // A ticket is never silently detached from the rows that give it meaning.
@@ -56,6 +58,15 @@ public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
             .WithMany()
             .HasForeignKey(t => t.AssignedAgentId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // History belongs to its ticket, and deleting a ticket must not silently take its
+        // audit trail with it.
+        builder.HasMany(t => t.Escalations)
+            .WithOne()
+            .HasForeignKey(e => e.TicketId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Navigation(t => t.Escalations).UsePropertyAccessMode(PropertyAccessMode.Field);
 
         builder.Ignore(t => t.IsOpen);
 

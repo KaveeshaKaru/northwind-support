@@ -1,3 +1,4 @@
+import { endSession, getAuthState } from '../auth/session';
 import type { ProblemDetails } from '../types/api';
 
 /**
@@ -26,17 +27,26 @@ export class ApiError extends Error {
 }
 
 /**
- * The single place that talks to the API. Returns parsed JSON, or throws an
- * {@link ApiError} that callers can show to the user.
+ * The single place that talks to the API. Attaches the signed-in agent's token, and returns
+ * parsed JSON or throws an {@link ApiError} that callers can show to the user.
  */
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const { session } = getAuthState();
+
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
+      ...(session ? { Authorization: `Bearer ${session.token}` } : {}),
       ...(init?.headers ?? {}),
     },
   });
+
+  // The API no longer accepts the token (usually it has expired). Ending the session sends the
+  // agent to the login page. A 401 without a token is a rejected sign-in - the login page's to show.
+  if (response.status === 401 && session) {
+    endSession('expired');
+  }
 
   if (!response.ok) {
     const problem = await readProblem(response);

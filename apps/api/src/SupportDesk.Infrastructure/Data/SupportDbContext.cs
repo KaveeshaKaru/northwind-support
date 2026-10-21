@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SupportDesk.Domain.Repositories;
+using SupportDesk.Infrastructure.Queries;
 
 namespace SupportDesk.Infrastructure.Data;
 
@@ -13,6 +14,7 @@ public class SupportDbContext(DbContextOptions<SupportDbContext> options) : DbCo
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(SupportDbContext).Assembly);
+        SqlDate.Register(modelBuilder, Database.ProviderName);
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

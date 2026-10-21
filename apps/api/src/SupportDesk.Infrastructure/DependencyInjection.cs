@@ -6,6 +6,7 @@ using SupportDesk.Domain.Repositories;
 using SupportDesk.Infrastructure.Data;
 using SupportDesk.Infrastructure.Queries;
 using SupportDesk.Infrastructure.Repositories;
+using SupportDesk.Infrastructure.Security;
 using SupportDesk.Infrastructure.Services;
 
 namespace SupportDesk.Infrastructure;
@@ -30,6 +31,8 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<SupportDbContext>());
 
         services.AddSingleton<IClock, SystemClock>();
+        services.AddSingleton<IPasswordHasher, AgentPasswordHasher>();
+        services.AddSingleton<ITokenIssuer, JwtTokenIssuer>();
 
         services.AddScoped<ITicketRepository, TicketRepository>();
         services.AddScoped<IAgentRepository, AgentRepository>();
@@ -40,6 +43,8 @@ public static class DependencyInjection
         services.AddScoped<ICustomerQueries, CustomerQueries>();
         services.AddScoped<IAgentQueries, AgentQueries>();
         services.AddScoped<ICategoryQueries, CategoryQueries>();
+        services.AddScoped<IAgentWorkloads, AgentWorkloads>();
+        services.AddScoped<ISlaReportQueries, SlaReportQueries>();
 
         services.AddScoped<SupportDbSeeder>();
 

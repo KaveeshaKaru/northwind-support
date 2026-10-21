@@ -1,3 +1,4 @@
+using SupportDesk.Domain.Aggregates.Tickets.Triage;
 using SupportDesk.Domain.Common;
 using SupportDesk.Domain.Exceptions;
 
@@ -13,6 +14,8 @@ namespace SupportDesk.Domain.Aggregates.Tickets;
 /// </remarks>
 public sealed class Ticket : AggregateRoot
 {
+    private readonly List<TicketEscalation> _escalations = [];
+
     private Ticket()
     {
         // For EF Core.
@@ -43,7 +46,19 @@ public sealed class Ticket : AggregateRoot
     /// <summary>When the team has committed to responding by. Null when no SLA applies.</summary>
     public DateTime? DueAtUtc { get; private set; }
 
+    /// <summary>
+    /// From when the ticket counts as at risk of missing <see cref="DueAtUtc"/>: the start of the
+    /// last part of its SLA window. Set together with the due date; null when no SLA applies.
+    /// </summary>
+    public DateTime? AtRiskFromUtc { get; private set; }
+
     public DateTime? ResolvedAtUtc { get; private set; }
+
+    /// <summary>
+    /// Escalations made while this instance was loaded. History is read through the query side;
+    /// it is not loaded with the ticket.
+    /// </summary>
+    public IReadOnlyCollection<TicketEscalation> Escalations => _escalations;
 
     /// <summary>True while the ticket still needs work from an agent.</summary>
     public bool IsOpen => Status is not (TicketStatus.Resolved or TicketStatus.Closed);
@@ -80,6 +95,18 @@ public sealed class Ticket : AggregateRoot
     }
 
     /// <summary>
+    /// Takes on what triage decided: the priority, the SLA dates and the owner (or none).
+    /// </summary>
+    public void ApplyTriage(TriageDecision decision, DateTime nowUtc)
+    {
+        Priority = decision.Priority;
+        DueAtUtc = decision.Sla.DueAtUtc;
+        AtRiskFromUtc = decision.Sla.AtRiskFromUtc;
+        AssignedAgentId = decision.Assignment.AgentId;
+        UpdatedAtUtc = nowUtc;
+    }
+
+    /// <summary>
     /// Moves the ticket through its lifecycle, keeping the resolution timestamp in step.
     /// </summary>
     /// <exception cref="BusinessRuleViolationException">The ticket is closed.</exception>
@@ -110,5 +137,53 @@ public sealed class Ticket : AggregateRoot
     {
         AssignedAgentId = agentId;
         UpdatedAtUtc = nowUtc;
+    }
+
+    /// <summary>The priority escalation would raise this ticket to: one level up.</summary>
+    /// <exception cref="BusinessRuleViolationException">
+    /// The ticket is already Critical, or it is Resolved or Closed.
+    /// </exception>
+    public TicketPriority EscalatedPriority()
+    {
+        if (!IsOpen)
+        {
+            throw new BusinessRuleViolationException(
+                $"Ticket {Reference} is {Status} and cannot be escalated.");
+        }
+
+        if (Priority == TicketPriority.Critical)
+        {
+            throw new BusinessRuleViolationException(
+                $"Ticket {Reference} is already Critical and cannot be escalated further.");
+        }
+
+        return Priority.Next();
+    }
+
+    /// <summary>
+    /// Escalates the ticket to what triage decided for it and records the change, with who did
+    /// it and why. The record is returned and kept with the ticket; it is never changed again.
+    /// </summary>
+    /// <exception cref="BusinessRuleViolationException">The ticket cannot be escalated.</exception>
+    public TicketEscalation Escalate(TriageDecision decision, string reason, string escalatedBy, DateTime nowUtc)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        ArgumentException.ThrowIfNullOrWhiteSpace(escalatedBy);
+
+        if (decision.Priority != EscalatedPriority())
+        {
+            throw new ArgumentException("An escalation must raise the priority by exactly one level.", nameof(decision));
+        }
+
+        var escalation = new TicketEscalation(
+            Priority, decision.Priority,
+            AssignedAgentId, decision.Assignment.AgentId,
+            DueAtUtc, decision.Sla.DueAtUtc,
+            reason.Trim(), escalatedBy.Trim(), nowUtc);
+
+        ApplyTriage(decision, nowUtc);
+        _escalations.Add(escalation);
+
+        return escalation;
     }
 }

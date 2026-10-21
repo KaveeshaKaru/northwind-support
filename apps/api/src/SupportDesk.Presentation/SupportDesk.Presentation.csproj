@@ -6,7 +6,17 @@
     <ProjectReference Include="../SupportDesk.Infrastructure/SupportDesk.Infrastructure.csproj" />
   </ItemGroup>
 
+  <!--
+    The local development settings (a fake signing key, a localhost connection string) are for
+    `dotnet run` only; a published build - and so the Docker image - never carries them.
+  -->
   <ItemGroup>
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
     <!-- Required for the EF Core CLI to use this project as its startup project. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
